@@ -18,7 +18,7 @@ const Profile = () => {
           <div className="flex flex-col items-center">
             <div className="w-32 h-32 rounded-full overflow-hidden shadow-md border-4 border-white">
               <Image
-                src="/profilephoto.png"
+                src="/UserAvatar.png"
                 alt="Profile Photo"
                 width={128}
                 height={128}

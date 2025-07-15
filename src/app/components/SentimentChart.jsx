@@ -30,8 +30,6 @@ const SentimentTimelineChart = () => {
   const padding = { top: 20, right: 40, bottom: 40, left: 80 };
 
   const getSentimentColor = (sentiment, position) => {
-    const normalizedPosition = position; 
-    
     if (sentiment > 0.3) {
       const intensity = Math.min(sentiment, 1);
       const r = Math.floor(70 + (255 - 70) * (1 - intensity));
@@ -45,7 +43,7 @@ const SentimentTimelineChart = () => {
       const b = Math.floor(100 * (1 - intensity));
       return `rgb(${r}, ${g}, ${b})`;
     } else {
-     return `rgb(150, 100, 200)`;
+      return `rgb(150, 100, 200)`;
     }
   };
 
@@ -64,49 +62,36 @@ const SentimentTimelineChart = () => {
   const drawChart = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, chartWidth, chartHeight);
-
     ctx.fillStyle = '#f8f9fa';
     ctx.fillRect(0, 0, chartWidth, chartHeight);
 
+    // Reference lines: positive, neutral, negative
     ctx.strokeStyle = '#e9ecef';
     ctx.lineWidth = 1;
-    
-    const positiveY = padding.top + (1 - (0.5 + 1) / 2) * (chartHeight - padding.top - padding.bottom);
-    ctx.beginPath();
-    ctx.moveTo(padding.left, positiveY);
-    ctx.lineTo(chartWidth - padding.right, positiveY);
-    ctx.stroke();
 
-    const neutralY = padding.top + (1 - (0 + 1) / 2) * (chartHeight - padding.top - padding.bottom);
-    ctx.beginPath();
-    ctx.moveTo(padding.left, neutralY);
-    ctx.lineTo(chartWidth - padding.right, neutralY);
-    ctx.stroke();
+    const referenceLines = [0.5, 0, -0.5];
+    const labels = ['Positive', 'Neutral', 'Negative'];
 
-    const negativeY = padding.top + (1 - (-0.5 + 1) / 2) * (chartHeight - padding.top - padding.bottom);
-    ctx.beginPath();
-    ctx.moveTo(padding.left, negativeY);
-    ctx.lineTo(chartWidth - padding.right, negativeY);
-    ctx.stroke();
+    referenceLines.forEach((value, i) => {
+      const y = padding.top + (1 - (value + 1) / 2) * (chartHeight - padding.top - padding.bottom);
+      ctx.beginPath();
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(chartWidth - padding.right, y);
+      ctx.stroke();
+      ctx.fillStyle = '#6c757d';
+      ctx.font = '12px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(labels[i], padding.left - 10, y);
+    });
 
-    ctx.fillStyle = '#6c757d';
-    ctx.font = '12px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    
-    ctx.fillText('Positive', padding.left - 10, positiveY);
-    ctx.fillText('Neutral', padding.left - 10, neutralY);
-    ctx.fillText('Negative', padding.left - 10, negativeY);
-
+    // Gradient sentiment line
     const gradient = ctx.createLinearGradient(padding.left, 0, chartWidth - padding.right, 0);
-    
-    sentimentData.forEach((point, index) => {
+    sentimentData.forEach(point => {
       const position = point.time / maxTime;
-      const color = getSentimentColor(point.sentiment, position);
-      gradient.addColorStop(position, color);
+      gradient.addColorStop(position, getSentimentColor(point.sentiment, position));
     });
 
     ctx.beginPath();
@@ -117,26 +102,24 @@ const SentimentTimelineChart = () => {
 
     sentimentData.forEach((point, index) => {
       const { x, y } = getCanvasCoords(point.time, point.sentiment);
-      
       if (index === 0) {
         ctx.moveTo(x, y);
       } else {
-        const prevPoint = sentimentData[index - 1];
-        const prevCoords = getCanvasCoords(prevPoint.time, prevPoint.sentiment);
-        const cpX = (prevCoords.x + x) / 2;
-        ctx.quadraticCurveTo(prevCoords.x + (cpX - prevCoords.x) * 0.5, prevCoords.y, x, y);
+        const prev = getCanvasCoords(sentimentData[index - 1].time, sentimentData[index - 1].sentiment);
+        const cpX = (prev.x + x) / 2;
+        ctx.quadraticCurveTo(prev.x + (cpX - prev.x) * 0.5, prev.y, x, y);
       }
     });
 
     ctx.stroke();
 
+    // Time markers
     ctx.fillStyle = '#6c757d';
     ctx.font = '11px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
-    const timeIntervals = [1, 8, 17, 25, 33, 42, 50, 58, 67, 75, 83, 92, 100, 108, 117, 125];
-    timeIntervals.forEach(time => {
+    sentimentData.forEach(({ time }) => {
       const x = padding.left + (time / maxTime) * (chartWidth - padding.left - padding.right);
       ctx.fillText(formatTime(time), x, chartHeight - padding.bottom + 5);
     });
@@ -151,11 +134,8 @@ const SentimentTimelineChart = () => {
     let foundPoint = null;
     sentimentData.forEach((point, index) => {
       const coords = getCanvasCoords(point.time, point.sentiment);
-      const distance = Math.sqrt(Math.pow(x - coords.x, 2) + Math.pow(y - coords.y, 2));
-      
-      if (distance <= 15) {
-        foundPoint = index;
-      }
+      const distance = Math.sqrt((x - coords.x) ** 2 + (y - coords.y) ** 2);
+      if (distance <= 15) foundPoint = index;
     });
 
     setHoveredPoint(foundPoint);
@@ -184,12 +164,14 @@ const SentimentTimelineChart = () => {
         />
         
         {hoveredPoint !== null && (
-          <div className="absolute bg-gray-800 text-white text-xs py-1 px-2 rounded shadow-lg pointer-events-none z-10"
-               style={{
-                 left: `${(sentimentData[hoveredPoint].time / maxTime) * 100}%`,
-                 top: '10px',
-                 transform: 'translateX(-50%)'
-               }}>
+          <div
+            className="absolute bg-gray-800 text-white text-xs py-1 px-2 rounded shadow-lg pointer-events-none z-10"
+            style={{
+              left: `${(sentimentData[hoveredPoint].time / maxTime) * 100}%`,
+              top: '10px',
+              transform: 'translateX(-50%)'
+            }}
+          >
             <div>Time: {formatTime(sentimentData[hoveredPoint].time)}</div>
             <div>Sentiment: {sentimentData[hoveredPoint].sentiment.toFixed(2)}</div>
           </div>
